@@ -1,0 +1,42 @@
+cff-version: 1.2.0
+message: "If you use this code or data, please cite the article below."
+title: "kundur-wecc-tlsesprit: code and data for the impact of PV plant control modes on the Kundur two-area system"
+type: software
+license: BSD-3-Clause
+repository-code: "https://github.com/AGonzalez73/kundur-wecc-tlsesprit"
+keywords:
+  - small-signal stability
+  - transient stability
+  - TLS-ESPRIT
+  - photovoltaic plants
+  - WECC generic models
+  - Kundur two-area system
+  - low-inertia power systems
+authors:
+  - family-names: "González Domínguez"
+    given-names: "Ángel"
+    affiliation: "Tecnológico Nacional de México – Instituto Tecnológico de La Laguna"
+    email: "m.agonzalezd@correo.itlalaguna.edu.mx"
+  - family-names: "García Viveros"
+    given-names: "Héctor"
+    affiliation: "Tecnológico Nacional de México – Instituto Tecnológico de La Laguna"
+  - family-names: "Arjona López"
+    given-names: "Marco A."
+    affiliation: "Tecnológico Nacional de México – Instituto Tecnológico de La Laguna"
+  - family-names: "Hernández"
+    given-names: "Concepción"
+    affiliation: "Tecnológico Nacional de México – Instituto Tecnológico de La Laguna"
+preferred-citation:
+  type: article
+  title: "Impact of Photovoltaic Power Plant Control Modes on Small-Signal and Transient Stability in Low-Inertia Power Systems"
+  journal: "IEEE Latin America Transactions"
+  year: 2026
+  authors:
+    - family-names: "González Domínguez"
+      given-names: "Ángel"
+    - family-names: "García Viveros"
+      given-names: "Héctor"
+    - family-names: "Arjona López"
+      given-names: "Marco A."
+    - family-names: "Hernández"
+      given-names: "Concepción"
