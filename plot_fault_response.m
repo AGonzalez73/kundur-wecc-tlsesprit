@@ -12,12 +12,12 @@ function plot_fault_response(dataDir, outDir)
 %           150-161 s.
 %   Fig. 4  active power through the tie-line from bus 7 to bus 9, PB79.
 %
-%   plot_fault_response(dataDir, outDir) reads the records in dataDir
-%   (default data/three_phase_fault) and writes PNG and PDF files to outDir
-%   (default results). A missing record is reported and skipped.
+%   plot_fault_response(dataDir, outDir) reads the Kundur_Fault_*.mat
+%   records in dataDir (default data) and writes PNG and PDF files to
+%   outDir (default results). A missing record is reported and skipped.
 
     here = fileparts(mfilename('fullpath'));
-    if nargin < 1 || isempty(dataDir), dataDir = fullfile(here, 'data', 'three_phase_fault'); end
+    if nargin < 1 || isempty(dataDir), dataDir = fullfile(here, 'data'); end
     if nargin < 2 || isempty(outDir),  outDir  = fullfile(here, 'results'); end
     if ~exist(outDir, 'dir'), mkdir(outDir); end
 

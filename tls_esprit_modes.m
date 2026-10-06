@@ -3,13 +3,13 @@
 %  Supplementary code -- IEEE Latin America Transactions
 %  ---------------------------------------------------------------------
 %  USAGE  Load one scenario into the workspace, set caseName below and
-%         run, e.g.   load(fullfile('data','small_signal','Kundur_PVcontrolP.mat'))
+%         run, e.g.   load(fullfile('data','Kundur_PVcontrolP.mat'))
 %                     tls_esprit_modes
 %         The script reads t1, PB79 and DwG3 from the workspace, prints a
 %         summary, draws one figure and writes results/<caseName>/
 %         (summary.txt and one table of modes per signal).
-%         run_all.m runs the four scenarios through run_tlsesprit_case.m,
-%         which presets caseName, doNoise and makePlots (struct runOpts).
+%         run_all.m runs the four scenarios and presets caseName, doNoise
+%         and makePlots through the struct runOpts.
 %         MATLAB R2018b or later, no toolboxes. Deterministic (fixed seed).
 %
 %  METHOD (the same settings for every scenario)
@@ -187,7 +187,7 @@ doSweep = true;   dT0Set = 0:0.1:0.5;   TwSet = (3:0.25:4)/fSlow;  %  [1]
 doNoise = true;   snrSet = [40 30 20];  nMC = 200;  rngSeed = 0;   %  [4]
 makePlots = true;
 
-% Presets from run_tlsesprit_case.m (absent in interactive use)
+% Presets from run_all.m (absent in interactive use)
 if exist('runOpts', 'var')
     caseName = runOpts.caseName;  doNoise = runOpts.doNoise;  makePlots = runOpts.makePlots;
 end

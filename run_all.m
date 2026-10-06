@@ -1,20 +1,20 @@
 function T = run_all(varargin)
-%RUN_ALL  Reproduces Table I and Figs. 3-4 of
+%RUN_ALL  Main script: reproduces Table I and Figs. 3-4 of
 %   A. González Domínguez, H. García Viveros, M. A. Arjona López and
 %   C. Hernández, "Impact of Photovoltaic Power Plant Control Modes on
 %   Small-Signal and Transient Stability in Low-Inertia Power Systems,"
 %   IEEE Latin America Transactions, 2026.
 %
-%   run_all                      full run: TLS-ESPRIT on the four
-%                                small-signal records (with window sweep
-%                                and Monte Carlo noise test), then Figs. 3-4
-%   run_all('noise', false)      skips the noise test (about a minute)
-%   run_all('plots', false)      no figures
-%   T = run_all(...)             also returns Table I as a MATLAB table
+%   run_all                     full run: TLS-ESPRIT on the four small-signal
+%                               records (window sweep and Monte Carlo noise
+%                               test included), then Figs. 3-4
+%   run_all('noise', false)     skips the noise test (about a minute)
+%   run_all('plots', false)     no figures
+%   T = run_all(...)            also returns Table I as a MATLAB table
 %
-%   Outputs in results/:
-%     table1.csv                 identified modes next to Table I
-%     <case>/summary.txt         full TLS-ESPRIT summary per scenario
+%   Outputs in results/ (created on the first run):
+%     table1.csv                         identified modes next to Table I
+%     <case>/summary.txt                 TLS-ESPRIT summary of each scenario
 %     <case>/PB79_modes.csv, DwG3_modes.csv, tlsesprit_modes.png
 %     fig3_angle_separation.png/.pdf, fig4_tieline_power.png/.pdf
 %
@@ -27,10 +27,10 @@ function T = run_all(varargin)
     opts = struct('doNoise', logical(p.Results.noise), 'makePlots', logical(p.Results.plots));
 
     root   = fileparts(mfilename('fullpath'));
-    oldDir = cd(root);
-    restoreDir = onCleanup(@() cd(oldDir));
+    oldDir = cd(root);                         % results/ is written here
+    restoreDir = onCleanup(@() cd(oldDir));    %#ok<NASGU>
 
-    % Scenario, record, and Table I of the paper (f in Hz, zeta per unit):
+    % Scenario, record in data/, and Table I of the paper (f in Hz, zeta pu):
     %            inter-area f, zeta     local Area 2 f, zeta
     cases = {'FullSync',  'Kundur_FullSync.mat',   [0.612 0.256  1.490 0.318]
              'P-control', 'Kundur_PVcontrolP.mat', [0.624 0.228  1.491 0.319]
@@ -42,12 +42,11 @@ function T = run_all(varargin)
     got = nan(nC, 4);  win = nan(nC, 8);  z30 = nan(nC, 4);
     for c = 1:nC
         fprintf('\n=================== %s ===================\n', cases{c,1});
-        r = run_tlsesprit_case(fullfile(root, 'data', 'small_signal', cases{c,2}), ...
-                               cases{c,1}, opts);
+        r = run_case(fullfile(root, 'data', cases{c,2}), cases{c,1}, opts);
         for s = 1:2       % 1: PB79 -> inter-area, 2: DwG3 -> local Area 2
-            got(c, 2*s-1:2*s)   = [r(s).f_Hz, r(s).zeta];
-            win(c, 4*s-3:4*s)   = [r(s).fWin_Hz, r(s).zetaWin];
-            z30(c, 2*s-1:2*s)   = r(s).zeta30dB;
+            got(c, 2*s-1:2*s) = [r(s).f_Hz, r(s).zeta];
+            win(c, 4*s-3:4*s) = [r(s).fWin_Hz, r(s).zetaWin];
+            z30(c, 2*s-1:2*s) = r(s).zeta30dB;
         end
     end
 
@@ -80,7 +79,55 @@ function T = run_all(varargin)
 
     %% Transient stability: three-phase fault at bus 9 (Figs. 3 and 4)
     if opts.makePlots
-        plot_fault_response(fullfile(root, 'data', 'three_phase_fault'), fullfile(root, 'results'));
+        plot_fault_response(fullfile(root, 'data'), fullfile(root, 'results'));
     end
     if nargout == 0, clear T; end      % no "ans = table" dump in the console
+end
+
+%% =====================================================================
+%  Local functions
+%% =====================================================================
+function out = run_case(recordFile, caseLabel, opts)
+%RUN_CASE  Runs tls_esprit_modes.m on one record. The record (t1, PB79,
+%   DwG3) is loaded into this workspace, where the script reads it;
+%   runOpts presets caseName, doNoise and makePlots in the script. The
+%   script's figure is saved to results/<caseLabel>/tlsesprit_modes.png.
+    res = [];  outDir = '';  snrSet = [];     % set by the script below
+    load(recordFile, 't1', 'PB79', 'DwG3');
+    runOpts = struct('caseName', caseLabel, 'doNoise', opts.doNoise, ...
+                     'makePlots', opts.makePlots);                  %#ok<NASGU>
+    tls_esprit_modes;
+
+    if opts.makePlots
+        hFig = get(groot, 'CurrentFigure');
+        if ~isempty(hFig)
+            set(hFig, 'Position', [80 80 1300 820], 'PaperPositionMode', 'auto');
+            print(hFig, fullfile(outDir, 'tlsesprit_modes.png'), '-dpng', '-r150');
+        end
+    end
+    out = collect_modes(res, snrSet);
+end
+
+function out = collect_modes(res, snrSet)
+%COLLECT_MODES  Mode reported for each signal (largest NE in its range):
+%   f [Hz], zeta, window-sweep ranges and 5-95 % zeta at 30 dB (per unit).
+    i30 = find(snrSet == 30, 1);
+    out = struct('signal', {}, 'label', {}, 'f_Hz', {}, 'zeta', {}, 'fWin_Hz', {}, ...
+                 'zetaWin', {}, 'zeta30dB', {}, 'NE', {}, 'fitPct', {});
+    for s = 1:numel(res)
+        R = res(s);
+        o = struct('signal', R.name, 'label', R.label, 'f_Hz', NaN, 'zeta', NaN, ...
+                   'fWin_Hz', [NaN NaN], 'zetaWin', [NaN NaN], 'zeta30dB', [NaN NaN], ...
+                   'NE', NaN, 'fitPct', R.fit);
+        if ~isempty(R.iT)
+            m = R.modes;  k = R.iT;
+            o.f_Hz    = m.Freq_Hz(k);
+            o.zeta    = m.Damping_pct(k) / 100;
+            o.fWin_Hz = [m.FminWin_Hz(k), m.FmaxWin_Hz(k)];
+            o.zetaWin = [m.ZminWin_pct(k), m.ZmaxWin_pct(k)] / 100;
+            o.NE      = m.NE(k);
+            if ~isempty(i30), o.zeta30dB = R.zNoise(i30, :) / 100; end
+        end
+        out(end+1) = o; %#ok<AGROW>
+    end
 end
