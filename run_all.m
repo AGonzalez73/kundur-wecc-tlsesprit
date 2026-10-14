@@ -1,133 +1,144 @@
-function T = run_all(varargin)
-%RUN_ALL  Main script: reproduces Table I and Figs. 3-4 of
-%   A. González Domínguez, H. García Viveros, M. A. Arjona López and
-%   C. Hernández, "Impact of Photovoltaic Power Plant Control Modes on
-%   Small-Signal and Transient Stability in Low-Inertia Power Systems,"
-%   IEEE Latin America Transactions, 2026.
-%
-%   run_all                     full run: TLS-ESPRIT on the four small-signal
-%                               records (window sweep and Monte Carlo noise
-%                               test included), then Figs. 3-4
-%   run_all('noise', false)     skips the noise test (about a minute)
+function run_all(varargin)
+%RUN_ALL  Reproduces the results of the paper from the records in data/.
+%   run_all                     operating point, Table I (TLS-ESPRIT) and figures
+%   run_all('noise', false)     skips the Monte Carlo noise test (about a minute)
 %   run_all('plots', false)     no figures
-%   T = run_all(...)            also returns Table I as a MATLAB table
-%
-%   Outputs in results/ (created on the first run):
-%     table1.csv                         identified modes next to Table I
-%     <case>/summary.txt                 TLS-ESPRIT summary of each scenario
-%     <case>/PB79_modes.csv, DwG3_modes.csv, tlsesprit_modes.png
-%     fig3_angle_separation.png/.pdf, fig4_tieline_power.png/.pdf
-%
-%   MATLAB R2018b or later, no toolboxes.
+%   run_all('simulate', true)   regenerates data/ with the Simulink models first
 
-    p = inputParser;
-    addParameter(p, 'noise', true, @(x) islogical(x) || isnumeric(x));
-    addParameter(p, 'plots', true, @(x) islogical(x) || isnumeric(x));
-    parse(p, varargin{:});
-    opts = struct('doNoise', logical(p.Results.noise), 'makePlots', logical(p.Results.plots));
+p = inputParser;
+addParameter(p, 'noise', true);
+addParameter(p, 'plots', true);
+addParameter(p, 'simulate', false);
+parse(p, varargin{:});
+opt = p.Results;
 
-    root   = fileparts(mfilename('fullpath'));
-    oldDir = cd(root);                         % results/ is written here
-    restoreDir = onCleanup(@() cd(oldDir));    %#ok<NASGU>
+root    = fileparts(mfilename('fullpath'));
+dataDir = fullfile(root, 'data');
+outDir  = fullfile(root, 'results');
+figDir  = fullfile(outDir, 'figures');
+addpath(root, fullfile(root, 'models'));
+if ~exist(figDir, 'dir'), mkdir(figDir); end
 
-    % Scenario, record in data/, and Table I of the paper (f in Hz, zeta pu):
-    %            inter-area f, zeta     local Area 2 f, zeta
-    cases = {'FullSync',  'Kundur_FullSync.mat',   [0.612 0.256  1.490 0.318]
-             'P-control', 'Kundur_PVcontrolP.mat', [0.624 0.228  1.491 0.319]
-             'Q-control', 'Kundur_PVcontrolQ.mat', [0.621 0.234  1.490 0.319]
-             'V-control', 'Kundur_PVcontrolV.mat', [0.636 0.216  1.498 0.315]};
-    nC = size(cases, 1);
-
-    %% Small-signal analysis: TLS-ESPRIT on the Vref pulse at G3 (Table I)
-    got = nan(nC, 4);  win = nan(nC, 8);  z30 = nan(nC, 4);
-    for c = 1:nC
-        fprintf('\n=================== %s ===================\n', cases{c,1});
-        r = run_case(fullfile(root, 'data', cases{c,2}), cases{c,1}, opts);
-        for s = 1:2       % 1: PB79 -> inter-area, 2: DwG3 -> local Area 2
-            got(c, 2*s-1:2*s) = [r(s).f_Hz, r(s).zeta];
-            win(c, 4*s-3:4*s) = [r(s).fWin_Hz, r(s).zetaWin];
-            z30(c, 2*s-1:2*s) = r(s).zeta30dB;
-        end
-    end
-
-    paper = cell2mat(cases(:,3));
-    T = table(cases(:,1), got(:,1), got(:,2), paper(:,1), paper(:,2), ...
-              got(:,3), got(:,4), paper(:,3), paper(:,4), ...
-              win(:,1), win(:,2), win(:,3), win(:,4), z30(:,1), z30(:,2), ...
-              win(:,5), win(:,6), win(:,7), win(:,8), z30(:,3), z30(:,4), ...
-        'VariableNames', {'Case', ...
-              'fInter_Hz', 'zetaInter', 'fInter_paper', 'zetaInter_paper', ...
-              'fLocal_Hz', 'zetaLocal', 'fLocal_paper', 'zetaLocal_paper', ...
-              'fInterWinMin', 'fInterWinMax', 'zetaInterWinMin', 'zetaInterWinMax', ...
-              'zetaInter30dB_p05', 'zetaInter30dB_p95', ...
-              'fLocalWinMin', 'fLocalWinMax', 'zetaLocalWinMin', 'zetaLocalWinMax', ...
-              'zetaLocal30dB_p05', 'zetaLocal30dB_p95'});
-    if ~exist('results', 'dir'), mkdir('results'); end
-    writetable(T, fullfile('results', 'table1.csv'));
-
-    fprintf('\n================ Table I: identified vs. paper ================\n');
-    fprintf('%-10s | %-24s | %-24s\n', '', 'Inter-area (PB79)', 'Local Area 2 (DwG3)');
-    fprintf('%-10s | %-11s %-12s | %-11s %-12s\n', 'Case', 'f [Hz]', 'zeta', 'f [Hz]', 'zeta');
-    for c = 1:nC
-        fprintf('%-10s | %.4f      %.4f       | %.4f      %.4f\n', cases{c,1}, got(c,:));
-        fprintf('%-10s | %.3f       %.3f        | %.3f       %.3f      (paper)\n', '', paper(c,:));
-    end
-    d = abs(got - paper);
-    fprintf(['Largest difference to the paper: %.4f Hz and %.4f in zeta (inter-area), ' ...
-             '%.4f Hz and %.4f in zeta (local)\n'], max(d(:,1)), max(d(:,2)), max(d(:,3)), max(d(:,4)));
-    fprintf('Written: %s\n', fullfile(root, 'results', 'table1.csv'));
-
-    %% Transient stability: three-phase fault at bus 9 (Figs. 3 and 4)
-    if opts.makePlots
-        plot_fault_response(fullfile(root, 'data'), fullfile(root, 'results'));
-    end
-    if nargout == 0, clear T; end      % no "ans = table" dump in the console
+if opt.simulate
+    simulate_cases;
 end
 
-%% =====================================================================
-%  Local functions
-%% =====================================================================
-function out = run_case(recordFile, caseLabel, opts)
-%RUN_CASE  Runs tls_esprit_modes.m on one record. The record (t1, PB79,
-%   DwG3) is loaded into this workspace, where the script reads it;
-%   runOpts presets caseName, doNoise and makePlots in the script. The
-%   script's figure is saved to results/<caseLabel>/tlsesprit_modes.png.
-    res = [];  outDir = '';  snrSet = [];     % set by the script below
-    load(recordFile, 't1', 'PB79', 'DwG3');
-    runOpts = struct('caseName', caseLabel, 'doNoise', opts.doNoise, ...
-                     'makePlots', opts.makePlots);                  %#ok<NASGU>
-    tls_esprit_modes;
+cases = {'sync', 'Fully synchronous'
+         'pv_p', 'P-control'
+         'pv_q', 'Q-control'
+         'pv_v', 'V-control'};
 
-    if opts.makePlots
-        hFig = get(groot, 'CurrentFigure');
-        if ~isempty(hFig)
-            set(hFig, 'Position', [80 80 1300 820], 'PaperPositionMode', 'auto');
-            print(hFig, fullfile(outDir, 'tlsesprit_modes.png'), '-dpng', '-r150');
-        end
+operating_point(dataDir, outDir, cases);
+T = table1(dataDir, outDir, cases, opt);
+
+if opt.plots
+    plot_damping(T, figDir, opt.noise);
+    for ev = {'pulse', 'fault12', 'fault9'}
+        plot_responses(dataDir, figDir, ev{1});
     end
-    out = collect_modes(res, snrSet);
+end
+fprintf('\nResults written to %s\n', outDir);
 end
 
-function out = collect_modes(res, snrSet)
-%COLLECT_MODES  Mode reported for each signal (largest NE in its range):
-%   f [Hz], zeta, window-sweep ranges and 5-95 % zeta at 30 dB (per unit).
-    i30 = find(snrSet == 30, 1);
-    out = struct('signal', {}, 'label', {}, 'f_Hz', {}, 'zeta', {}, 'fWin_Hz', {}, ...
-                 'zetaWin', {}, 'zeta30dB', {}, 'NE', {}, 'fitPct', {});
-    for s = 1:numel(res)
-        R = res(s);
-        o = struct('signal', R.name, 'label', R.label, 'f_Hz', NaN, 'zeta', NaN, ...
-                   'fWin_Hz', [NaN NaN], 'zetaWin', [NaN NaN], 'zeta30dB', [NaN NaN], ...
-                   'NE', NaN, 'fitPct', R.fit);
-        if ~isempty(R.iT)
-            m = R.modes;  k = R.iT;
-            o.f_Hz    = m.Freq_Hz(k);
-            o.zeta    = m.Damping_pct(k) / 100;
-            o.fWin_Hz = [m.FminWin_Hz(k), m.FmaxWin_Hz(k)];
-            o.zetaWin = [m.ZminWin_pct(k), m.ZmaxWin_pct(k)] / 100;
-            o.NE      = m.NE(k);
-            if ~isempty(i30), o.zeta30dB = R.zNoise(i30, :) / 100; end
+function operating_point(dataDir, outDir, cases)
+fprintf('\nOperating point at t = 149 s\n');
+fprintf('%-14s %9s %10s %12s %8s %8s %9s\n', 'Record', 'P79[MW]', 'P_bus6[MW]', 'Q_bus6[MVAr]', ...
+        'V7[pu]', 'V9[pu]', 'f[Hz]');
+rows = {};
+for c = 1:size(cases, 1)
+    for ev = {'pulse', 'fault12', 'fault9'}
+        name = [cases{c,1} '_' ev{1}];
+        file = fullfile(dataDir, [name '.mat']);
+        if ~exist(file, 'file'), continue; end
+        d = load(file);
+        i = find(d.t1 >= 149, 1);
+        if isfield(d, 'PB5')
+            P6 = d.PB5(i);  Q6 = d.PB5Q(i);
+        else
+            P6 = d.PB2(i);  Q6 = d.QB2(i);
         end
-        out(end+1) = o; %#ok<AGROW>
+        x = [d.PB79(i), P6, Q6, d.VB79(i,1), d.VB79(i,2), 60*(1 + d.dwT(i,1))];
+        fprintf('%-14s %9.2f %10.2f %12.2f %8.4f %8.4f %9.4f\n', name, x);
+        rows(end+1, :) = [{name}, num2cell(x)]; %#ok<AGROW>
     end
+end
+T = cell2table(rows, 'VariableNames', {'Record', 'P79_MW', 'Pbus6_MW', 'Qbus6_MVAr', ...
+               'V7_pu', 'V9_pu', 'f_Hz'});
+writetable(T, fullfile(outDir, 'operating_point.csv'));
+end
+
+function T = table1(dataDir, outDir, cases, opt)
+n = size(cases, 1);
+v = nan(n, 16);
+for c = 1:n
+    rec = load(fullfile(dataDir, [cases{c,1} '_pulse.mat']), 't1', 'PB79', 'DwG3');
+    fprintf('\n=================== %s ===================\n', cases{c,2});
+    res = tls_esprit_modes(rec, cases{c,2}, opt.noise, opt.plots, fullfile(outDir, cases{c,1}));
+    for q = 1:numel(res)
+        R = res(q);  m = R.modes;  k = R.iT;  s = 1 + strcmp(R.name, 'DwG3');
+        if isempty(k), continue; end
+        z30 = R.zNoise(R.snrSet == 30, :);
+        v(c, 8*s-7:8*s) = [m.Freq_Hz(k), m.Damping_pct(k), m.FminWin_Hz(k), m.FmaxWin_Hz(k), ...
+                           m.ZminWin_pct(k), m.ZmaxWin_pct(k), z30] .* [1 0.01 1 1 0.01 0.01 0.01 0.01];
+    end
+end
+names = {'f', 'zeta', 'fWinMin', 'fWinMax', 'zetaWinMin', 'zetaWinMax', 'zeta30dB_p05', 'zeta30dB_p95'};
+T = cell2table([cases(:,2), num2cell(v)], 'VariableNames', ...
+               [{'Case'}, strcat('Inter_', names), strcat('Local_', names)]);
+writetable(T, fullfile(outDir, 'table1.csv'));
+
+fprintf('\nTable I. Electromechanical modes (f in Hz, zeta in pu; window-sweep range in brackets)\n');
+fprintf('%-18s | %-30s | %-30s\n', '', 'Inter-area (P79)', 'Local Area 2 (DwG3)');
+for c = 1:n
+    fprintf('%-18s | %.4f  %.4f [%.4f-%.4f] | %.4f  %.4f [%.4f-%.4f]\n', cases{c,2}, ...
+            v(c,[1 2 5 6]), v(c,[9 10 13 14]));
+end
+if opt.noise
+    fprintf('\nzeta 5-95 %% interval at 30 dB SNR (inter-area / local)\n');
+    C = [cases(:,2), num2cell(v(:,[7 8 15 16]))].';
+    fprintf('%-18s | %.4f-%.4f | %.4f-%.4f\n', C{:});
+end
+end
+
+function plot_damping(T, figDir, withNoise)
+fig = figure('Color', 'w', 'Position', [100 100 1200 420]);
+if isprop(fig, 'Theme'), theme(fig, 'light'); end
+mode = {'Inter', 'Inter-area mode (P_{79})'; 'Local', 'Local mode of Area 2 (\Delta\omega_{G3})'};
+n = height(T);  y = n:-1:1;
+Z = cell(2, 3);
+for s = 1:2
+    Z{s,1} = 100*T.([mode{s,1} '_zeta']);
+    Z{s,2} = 100*[T.([mode{s,1} '_zetaWinMin']), T.([mode{s,1} '_zetaWinMax'])];
+    Z{s,3} = 100*[T.([mode{s,1} '_zeta30dB_p05']), T.([mode{s,1} '_zeta30dB_p95'])];
+    if ~withNoise, Z{s,3}(:) = NaN; end
+end
+span = max(cellfun(@(a, b, c) max([a; b(:); c(:)]) - min([a; b(:); c(:)]), Z(:,1), Z(:,2), Z(:,3)));
+span = max(4, 1.3*span);
+for s = 1:2
+    ax = subplot(1, 2, s);  axs(s) = ax;  hold(ax, 'on');  grid(ax, 'on');  box(ax, 'on');
+    z = Z{s,1};  w = Z{s,2};  nz = Z{s,3};
+    for c = 1:n
+        plot(ax, nz(c,:), [y(c) y(c)], '-', 'Color', [0.75 0.82 0.92], 'LineWidth', 9);
+        plot(ax, w(c,:), [y(c) y(c)], '-', 'Color', [0 0.45 0.74], 'LineWidth', 1.5);
+    end
+    plot(ax, z, y, 'o', 'Color', [0 0.45 0.74], 'MarkerFaceColor', [0 0.45 0.74], 'MarkerSize', 8);
+    text(ax, z, y + 0.25, arrayfun(@(x) sprintf('%.2f', x), z, 'UniformOutput', false), ...
+         'FontSize', 11, 'HorizontalAlignment', 'center');
+    c0 = (min([z; w(:); nz(:)]) + max([z; w(:); nz(:)]))/2;
+    set(ax, 'YTick', 1:n, 'YTickLabel', flipud(T.Case), 'YLim', [0.4 n + 0.6], ...
+            'XLim', c0 + span*[-0.5 0.5], 'FontSize', 12);
+    if s == 2, set(ax, 'YTickLabel', {}); end
+    xlabel(ax, 'Damping ratio  \zeta  [%]');
+    title(ax, mode{s,2});
+end
+ax = axs(1);
+h = [plot(ax, NaN, NaN, 'o', 'Color', [0 0.45 0.74], 'MarkerFaceColor', [0 0.45 0.74]), ...
+     plot(ax, NaN, NaN, '-', 'Color', [0 0.45 0.74], 'LineWidth', 1.5)];
+lbl = {'Identified', 'Window sweep'};
+if withNoise
+    h(3) = plot(ax, NaN, NaN, '-', 'Color', [0.75 0.82 0.92], 'LineWidth', 9);
+    lbl{3} = '30 dB noise, 5-95 %';
+end
+legend(ax, h, lbl, 'Location', 'southeast', 'FontSize', 10);
+print(fig, fullfile(figDir, 'damping_comparison.png'), '-dpng', '-r200');
 end
