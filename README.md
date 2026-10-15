@@ -6,14 +6,14 @@
 
 This repository contains the Simulink models, the simulation records and the MATLAB code that reproduce the small-signal (Table I) and transient-stability results of the paper.
 
-## Overview
+## 🔎 Overview
 
-Generator G2 of the Kundur two-area system is replaced by a grid-following photovoltaic (PV) plant modeled with the WECC generic models REGC_A, REEC_B and REPC_A. The plant injects at bus 6 the same steady-state power that G2 delivered through its transformer, so the four scenarios start from the same operating point. G1, G3 and G4 keep their exciter, steam turbine governor and Δω power system stabilizer.
+Generator G2 of the Kundur two-area system is replaced by a grid-following photovoltaic (PV) plant modeled with the WECC generic models REGC_A, REEC_A and REPC_A. The plant injects at bus 6 the same steady-state power that G2 delivered through its transformer, so the four scenarios start from the same operating point. G1, G3 and G4 keep their exciter, steam turbine governor and Δω power system stabilizer.
 
 | Scenario | Record prefix | PV plant control |
 |---|---|---|
 | Fully synchronous | `sync` | None (G1–G4 synchronous) |
-| P-control | `pv_p` | Constant local power factor (REEC_B, PfFlag = 1) |
+| P-control | `pv_p` | Constant local power factor (REEC_A, PfFlag = 1) |
 | Q-control | `pv_q` | Plant-level reactive power control at bus 6 (REPC_A, RefFlag = 0) |
 | V-control | `pv_v` | Plant-level voltage control at bus 6 (REPC_A, RefFlag = 1, VcompFlag = 1, Rc = Xc = 0) |
 
@@ -22,7 +22,7 @@ In the three PV scenarios the active power is constant (FrqFlag = 0) and reactiv
 - **Small signal:** a 0.02 pu pulse on the AVR voltage reference of G3, 150.0–150.1 s. TLS-ESPRIT identifies the inter-area mode in the tie-line power P79 and the local mode of Area 2 in the rotor speed of G3 (Table I).
 - **Large signal:** a three-phase fault at bus 9 cleared after 12 cycles (200 ms) or 9 cycles (150 ms), without line tripping.
 
-## Repository contents
+## 📁 Repository Contents
 
 ```
 .
@@ -48,7 +48,7 @@ In the three PV scenarios the active power is constant (FrqFlag = 0) and reactiv
 | `models/kundur_sync.slx` | Section II | Network, machines and controls of the reference case. The PV plant blocks are present but commented out. |
 | `models/kundur_pv.slx` | Section II | Same network with G2 and its transformer commented out and the PV plant connected to bus 6. |
 
-### Simulation records (`data/`)
+### 🗂️ Simulation Records (`data/`)
 
 Outputs of the Simulink models from 0 to 200 s, sampled at 60 Hz (12 001 samples). Event: `pulse`, `fault12` or `fault9`.
 
@@ -71,12 +71,12 @@ Outputs of the Simulink models from 0 to 200 s, sampled at 60 Hz (12 001 samples
 
 In the PV records the second column of `dwT` and `dthetaT` (G2) is zero.
 
-## Requirements
+## 💻 Requirements
 
 - Analysis (`run_all`): MATLAB R2018b or later, no toolboxes.
-- Simulation (`simulate_cases`, `run_all('simulate', true)`): MATLAB/Simulink R2023b or later with Simscape Electrical (Specialized Power Systems) and Stateflow.
+- Simulation (`simulate_cases`, `run_all('simulate', true)`): MATLAB/Simulink R2018b to R2025a only, with Simscape Electrical (Specialized Power Systems) and Stateflow.
 
-## How to run
+## ▶️ How to Run
 
 1. Clone or download the repository and open MATLAB in its folder.
 2. Run
@@ -99,13 +99,13 @@ rec = load(fullfile('data', 'pv_q_pulse.mat'));
 res = tls_esprit_modes(rec, 'Q-control');
 ```
 
-## Expected results
+## 📊 Expected Results
 
 Table I (f in Hz, ζ per unit):
 
 | Case | Inter-area f | Inter-area ζ | Local Area 2 f | Local Area 2 ζ |
 |---|---|---|---|---|
-| Fully synchronous | 0.6124 | 0.2566 | 1.4965 | 0.3180 |
+| Fully synchronous | 0.6124 | 0.2566 | 1.4965 | 0.3181 |
 | P-control | 0.6229 | 0.2276 | 1.4946 | 0.3200 |
 | Q-control | 0.6245 | 0.2316 | 1.4971 | 0.3201 |
 | V-control | 0.6337 | 0.2179 | 1.4945 | 0.3198 |
@@ -121,7 +121,7 @@ Before the disturbances every record has P79 = 400.4 MW, 699.9 MW and 131.5–13
 | `figures/pulse_P79.png` | P79 after the AVR pulse |
 | `figures/fault12_P79`, `fault12_angle`, `fault9_P79`, `fault9_angle` (.png, .pdf) | P79 and Δδ after the 12- and 9-cycle faults |
 
-## Notes for reproducibility
+## 📌 Notes for Reproducibility
 
 - Each simulation runs 150 s before the disturbance so that all scenarios reach steady state.
 - Operating point: the reference case uses the load flow of the Kundur system (Kundur, Example 12.6) with constant-PQ loads; in the time domain the loads are constant impedance. Transformers have no magnetizing branch (Rm = Lm = 10⁴ pu) and machine saturation is not modeled. Governor references equal the initial mechanical power, so the frequency is 60 Hz.
@@ -130,8 +130,7 @@ Before the disturbances every record has P79 = 400.4 MW, 699.9 MW and 131.5–13
 - Robustness checks: 30 windows (start shifted 0–0.5 s, length 3–4 periods) and white noise at 40, 30 and 20 dB SNR, 200 runs per level, with a fixed random seed.
 - Δδ uses the inertia constants H = 6.5 s (G1, G2) and 6.175 s (G3, G4). Area 1 is G1 and G2 in the synchronous case and G1 alone in the PV scenarios.
 - The synchronous-machine controls follow the Simscape Electrical example `power_PSS` (Excitation System, Steam Turbine and Governor, Generic Power System Stabilizer). The PV plant models and parameters come from [jonlesage/Renewable-PPMV](https://github.com/jonlesage/Renewable-PPMV), with ratings of 900 MVA and 230 kV, plant-controller gains Kp = 0.6, Ki = 1.8, Kpg = 0.1 and Kig = 0.5, and plant reactive power limits of ±0.435 pu.
-
-## Method references
+## 📚 Method References
 
 1. NERC, "Recommended Oscillation Analysis for Monitoring and Mitigation Reference Document," Nov. 2021.
 2. R. Roy and T. Kailath, "ESPRIT—Estimation of signal parameters via rotational invariance techniques," *IEEE Trans. Acoust., Speech, Signal Process.*, vol. 37, no. 7, pp. 984–995, 1989.
@@ -144,12 +143,11 @@ Before the disturbances every record has P79 = 400.4 MW, 699.9 MW and 131.5–13
 9. MathWorks, "modalsd: Generate stabilization diagram for modal analysis," Signal Processing Toolbox documentation.
 10. J. Follum, F. Tuffner, L. Dosiek and J. Pierre, "Power system oscillatory behaviors: Sources, characteristics, & analyses," PNNL-26375, May 2017.
 
-## Citation
+## 📝 Citation
 
 ```bibtex
 @article{gonzalezdominguez2026pv,
-  author  = {Gonz{\'a}lez Dom{\'i}nguez, {\'A}ngel and Garc{\'i}a Viveros, H{\'e}ctor and
-             Arjona L{\'o}pez, Marco A. and Hern{\'a}ndez, Concepci{\'o}n},
+  author  = {{\'A}. {Gonz{\'a}lez Dom{\'i}nguez} and H.~{Garc{\'i}a Viveros}},
   title   = {Impact of Photovoltaic Power Plant Control Modes on Small-Signal and
              Transient Stability in Low-Inertia Power Systems},
   journal = {IEEE Latin America Transactions},
@@ -157,14 +155,14 @@ Before the disturbances every record has P79 = 400.4 MW, 699.9 MW and 131.5–13
 }
 ```
 
-## Contact
+## ✉️ Contact
 
 Ángel González Domínguez — m.agonzalezd@correo.itlalaguna.edu.mx
 
-## License
+## ⚖️ License
 
-Code and data are released under the BSD 3-Clause License (see `LICENSE`). The PV plant models derive from jonlesage/Renewable-PPMV (The MathWorks, Inc., BSD 3-Clause).
+Code and data are released under the BSD 3-Clause License (see `LICENSE`). The PV plant blocks of the Simulink models and `models/SolarInverter_Params.m` are adapted from [jonlesage/Renewable-PPMV](https://github.com/jonlesage/Renewable-PPMV), Copyright (c) 2024, The MathWorks, Inc., also under the BSD 3-Clause License; its notice is reproduced in `LICENSE`.
 
-## Acknowledgment
+## 🙏 Acknowledgment
 
 Tecnológico Nacional de México – Instituto Tecnológico de La Laguna and the Secretaría de Ciencia, Humanidades, Tecnología e Innovación (SECIHTI).
