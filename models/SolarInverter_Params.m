@@ -40,7 +40,7 @@ repc_Tlag = 0.2;        % Plant Controller Lag Time Constant [s]
 repc_Pmax = 1;          % Maximum Plant Active Power [pu]
 repc_Pmin = 0;          % Minimum Plant Active Power [pu]
 
-%% REEC_B Parameters
+%% REEC_A Parameters
 reec_Trv = 0.01;        % Terminal Bus Filter [s]
 reec_Vdip = 0.9;        % Low Voltage Trigger [pu]
 reec_Vup = 1.15;        % High Voltage Trigger [pu]
